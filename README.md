@@ -1,1 +1,1 @@
-# group-project
+# Guessio (Group Project - Hacktiv8)
