@@ -46,18 +46,28 @@ io.on('connection', (socket) => {
         if (socket.id === roomMaster.id) {
             secretNumber = number;
             console.log('Room Master set the number:', secretNumber);
-            io.emit('gameStart');  
-            startCountdown();  
+            io.emit('gameStart');
+            startCountdown();
         }
     });
 
+    // socket.on('makeGuess', (guess) => {
+    //     if (guess == secretNumber) {
+    //         io.emit('gameEnd', { winnerId: socket.id, winnerName: getUsernameById(socket.id) });
+    //     } else {
+    //         io.emit('guessResult', { playerId: socket.id, guess });
+    //     }
+    // });
     socket.on('makeGuess', (guess) => {
         if (guess == secretNumber) {
-            io.emit('gameEnd', { winnerId: socket.id, winnerName: getUsernameById(socket.id) });
+            const winnerName = getUsernameById(socket.id);
+            console.log('Winner Name:', winnerName);
+            io.emit('gameEnd', { winnerId: socket.id, winnerName });
         } else {
             io.emit('guessResult', { playerId: socket.id, guess });
         }
     });
+
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
@@ -77,7 +87,7 @@ io.on('connection', (socket) => {
 });
 
 function startCountdown() {
-    let countdown = 180; // 3 minutes
+    let countdown = 180;
     const countdownInterval = setInterval(() => {
         io.emit('countdownUpdate', countdown);
         countdown--;
@@ -88,11 +98,20 @@ function startCountdown() {
         }
     }, 1000);
 }
-
+// function getUsernameById(id) {
+//     const player = players.find(player => player.id === id);
+//     console.log(players, player, id);
+//     return player ? player.username : 'BABI';
+// }
 function getUsernameById(id) {
     const player = players.find(player => player.id === id);
+    console.log('All Players:', players);
+    console.log('Searched ID:', id);
+    console.log('Found Player:', player);
     return player ? player.username : 'Unknown';
 }
+
+
 
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
