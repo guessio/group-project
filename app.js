@@ -1,90 +1,87 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
-
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    }
-});
+const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
-app.use(cors());
-
-app.get('/', (req, res) => {
-    res.json({ message: 'waw mantap' });
-});
-
-let masterId = null; // ID from RM
-let currentNumber = null; // Angka yang harus ditebak
+let roomMaster = null;
+let secretNumber = null;
 let players = [];
-let isGameOver = false;
 
-// Socket.io event handler
 io.on('connection', (socket) => {
-    console.log('A user connected', socket.id);
+    console.log('A user connected:', socket.id);
 
-    // Handle player joining the game
-    socket.on('join_game', (username) => {
-        players.push({ id: socket.id, username });
-        io.emit('player_list', players);
+    socket.on('joinGame', (username) => {
+        const player = { id: socket.id, username, isRoomMaster: false };
+        players.push(player);
 
-        // Set player as master if they are the first one to join
-        if (players.length === 1) {
-            masterId = socket.id;
-            socket.emit('set_as_master');
+        if (!roomMaster) {
+            roomMaster = player;
+            player.isRoomMaster = true;
+            io.to(socket.id).emit('roomMasterAssigned', player);
+        }
+
+        io.emit('playersUpdate', players);
+        io.emit('waitingForPlayers', players.length < 2);
+
+        console.log(`${username} joined the game`);
+    });
+
+    socket.on('setNumber', (number) => {
+        if (socket.id === roomMaster.id) {
+            secretNumber = number;
+            console.log('Room Master set the number:', secretNumber);
+            io.emit('gameStart');
+            startCountdown();
         }
     });
 
-    // RM set the number
-    socket.on('set_number', (number) => {
-        if (socket.id === masterId && !currentNumber) {
-            currentNumber = number;
-            io.emit('game_started');
-        }
-    });
-
-    // Handle player guessing a number
-    socket.on('guess_number', ({ username, guess }) => {
-        if (isGameOver || !currentNumber) return;
-
-        if (guess === currentNumber) {
-            isGameOver = true;
-            io.emit('game_over', { winner: username, number: currentNumber });
+    socket.on('makeGuess', (guess) => {
+        if (guess == secretNumber) {
+            io.emit('gameEnd', { winnerId: socket.id, winnerName: getUsernameById(socket.id) });
         } else {
-            io.emit('guess_result', { username, guess });
+            io.emit('guessResult', { playerId: socket.id, guess });
         }
     });
 
-    // Handle player disconnecting
     socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
         players = players.filter(player => player.id !== socket.id);
 
-        // Reset the game if RM disconnects
-        if (socket.id === masterId) {
-            resetGame();
+        if (roomMaster && roomMaster.id === socket.id) {
+            roomMaster = players.length > 0 ? players[0] : null;
+            if (roomMaster) {
+                roomMaster.isRoomMaster = true;
+                io.to(roomMaster.id).emit('roomMasterAssigned', roomMaster);
+            }
         }
 
-        io.emit('player_list', players);
-        console.log('A user disconnected', socket.id);
+        io.emit('playersUpdate', players);
+        io.emit('waitingForPlayers', players.length < 2);
     });
 });
 
-const resetGame = () => {
-    masterId = null;
-    currentNumber = null;
-    isGameOver = false;
-    players = [];
-    io.emit('game_reset');
-};
+function startCountdown() {
+    let countdown = 180; // 3 minutes
+    const countdownInterval = setInterval(() => {
+        io.emit('countdownUpdate', countdown);
+        countdown--;
+
+        if (countdown < 0) {
+            clearInterval(countdownInterval);
+            io.emit('gameEnd', { winnerId: null });
+        }
+    }, 1000);
+}
+
+function getUsernameById(id) {
+    const player = players.find(player => player.id === id);
+    return player ? player.username : 'Unknown';
+}
 
 server.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
