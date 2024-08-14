@@ -13,17 +13,16 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000
 
 app.get('/', (req, res) => {
-    res.json({ message: "mantab gan joz" })
+    res.json({ message: "guessio server" })
 })
 
-
-let roomMaster = null;
-let secretNumber = null;
-let players = [];
+let roomMaster = null
+let secretNumber = null
+let players = []
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
-    console.log(players, '<< p')
+    // console.log(players, '<< p')
 
     socket.on('joinGame', (username) => {
         
@@ -67,7 +66,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         players = players.filter(player => player.id !== socket.id);
-        console.log(players?.length, '<<< total player')
+        // console.log(players?.length, '<<< total player')
 
         if (roomMaster && roomMaster.id === socket.id) {
             roomMaster = players.length > 0 ? players[0] : null;
