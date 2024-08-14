@@ -1,31 +1,29 @@
-const express = require('express')
-const http = require('http')
-const { Server } = require('socket.io')
-const app = express()
-const server = http.createServer(app)
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: '*',
         methods: ['GET', 'POST']
     }
-})
+});
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.json({ message: "guessio server" })
-})
+    res.json({ message: "guessio server" });
+});
 
-let roomMaster = null
-let secretNumber = null
-let players = []
+let roomMaster = null;
+let secretNumber = null;
+let players = [];
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
-    // console.log(players, '<< p')
 
     socket.on('joinGame', (username) => {
-        
         const player = { id: socket.id, username, isRoomMaster: false };
         players.push(player);
 
@@ -39,9 +37,7 @@ io.on('connection', (socket) => {
         io.emit('game:status', 'waiting');
 
         if (players.length >= 3) {
-            // io.emit('gameStart');
             io.emit('game:status', 'ready');
-            startCountdown();
         }
         console.log(`${username} joined the game`);
     });
@@ -50,8 +46,8 @@ io.on('connection', (socket) => {
         if (socket.id === roomMaster.id) {
             secretNumber = number;
             console.log('Room Master set the number:', secretNumber);
-            io.emit('game:status', 'playing');
-            startCountdown();
+            io.emit('gameStart');  
+            startCountdown();  
         }
     });
 
@@ -66,7 +62,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         players = players.filter(player => player.id !== socket.id);
-        // console.log(players?.length, '<<< total player')
 
         if (roomMaster && roomMaster.id === socket.id) {
             roomMaster = players.length > 0 ? players[0] : null;
@@ -89,16 +84,16 @@ function startCountdown() {
 
         if (countdown < 0) {
             clearInterval(countdownInterval);
-            io.emit('gameEnd', { winnerId: null })
+            io.emit('gameEnd', { winnerId: null, winnerName: null });
         }
     }, 1000);
 }
 
 function getUsernameById(id) {
     const player = players.find(player => player.id === id);
-    return player ? player.username : 'Unknown'
+    return player ? player.username : 'Unknown';
 }
 
 server.listen(PORT, () => {
-    console.log(`Server running in http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });
